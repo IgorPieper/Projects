@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Two Point Oh</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Tailwind config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { primary: '#2563eb' }
+        }
+      }
+    }
+  </script>
+
+  <script>
+    // === CONFIG ===
+    const API_ENDPOINT = "YOUR_API_GATEWAY_ENDPOINT";
+
+    function parseCoord(value) {
+      const v = String(value ?? "").trim().replace(",", ".");
+      const num = Number(v);
+      return Number.isFinite(num) ? num : null;
+    }
+
+    function setStatus({ type, title, message }) {
+      const box = document.getElementById("resultBox");
+      const titleEl = document.getElementById("resultTitle");
+      const msgEl = document.getElementById("resultMessage");
+
+      box.classList.remove("hidden");
+
+      const base = "rounded-xl border p-5";
+      const variants = {
+        idle:    "border-slate-200 bg-white",
+        loading: "border-slate-200 bg-white",
+        success: "border-emerald-200 bg-emerald-50",
+        error:   "border-rose-200 bg-rose-50",
+      };
+
+      box.className = `${base} ${variants[type] || variants.idle}`;
+      titleEl.textContent = title || "";
+      msgEl.textContent = message || "";
+    }
+
+    function setLoading(isLoading) {
+      const btn = document.getElementById("calcBtn");
+      const btnText = document.getElementById("calcBtnText");
+      const spinner = document.getElementById("spinner");
+
+      btn.disabled = isLoading;
+      btn.classList.toggle("opacity-60", isLoading);
+      btn.classList.toggle("cursor-not-allowed", isLoading);
+
+      spinner.classList.toggle("hidden", !isLoading);
+      btnText.textContent = isLoading ? "Calculating..." : "Calculate";
+    }
+
+    async function callAPI(lat1, lon1, lat2, lon2) {
+      setLoading(true);
+      setStatus({ type: "loading", title: "Working", message: "Contacting the distance service..." });
+
+      try {
+        const myHeaders = new Headers();
+        myHeaders.append("Content-Type", "application/json");
+
+        const raw = JSON.stringify({ lat1, lon1, lat2, lon2 });
+
+        const response = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: myHeaders,
+          body: raw,
+          redirect: "follow",
+        });
+
+        const text = await response.text();
+
+        let parsed;
+        try { parsed = JSON.parse(text); } catch { parsed = null; }
+
+        // Supports API Gateway Lambda proxy style: { statusCode, body: "..." }
+        const body = parsed?.body ?? text;
+
+        if (!response.ok) {
+          setStatus({
+            type: "error",
+            title: "Service error",
+            message: `HTTP ${response.status}. Response: ${String(body).slice(0, 300)}`
+          });
+          return;
+        }
+
+        setStatus({
+          type: "success",
+          title: "Result",
+          message: `Distance: ${body} km`
+        });
+      } catch (err) {
+        setStatus({
+          type: "error",
+          title: "Network error",
+          message: String(err)
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function onCalculateClick() {
+      const lat1 = parseCoord(document.getElementById("lat1").value);
+      const lon1 = parseCoord(document.getElementById("lon1").value);
+      const lat2 = parseCoord(document.getElementById("lat2").value);
+      const lon2 = parseCoord(document.getElementById("lon2").value);
+
+      if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) {
+        setStatus({
+          type: "error",
+          title: "Invalid input",
+          message: "Please enter valid numeric values (dot or comma accepted)."
+        });
+        return;
+      }
+      if (lat1 < -90 || lat1 > 90 || lat2 < -90 || lat2 > 90) {
+        setStatus({
+          type: "error",
+          title: "Invalid latitude",
+          message: "Latitude must be between -90 and 90."
+        });
+        return;
+      }
+      if (lon1 < -180 || lon1 > 180 || lon2 < -180 || lon2 > 180) {
+        setStatus({
+          type: "error",
+          title: "Invalid longitude",
+          message: "Longitude must be between -180 and 180."
+        });
+        return;
+      }
+
+      callAPI(lat1, lon1, lat2, lon2);
+    }
+
+    function fillExample() {
+      document.getElementById("lat1").value = "47.5975024";
+      document.getElementById("lon1").value = "-122.3492781";
+      document.getElementById("lat2").value = "40.7579787";
+      document.getElementById("lon2").value = "-73.9900326";
+      setStatus({ type: "idle", title: "Example loaded", message: "Click “Calculate” to get the distance." });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      setStatus({ type: "idle", title: "Ready", message: "Enter coordinates and click “Calculate”." });
+    });
+  </script>
+</head>
+
+<body class="bg-white text-slate-800">
+
+<!-- NAV -->
+<header class="border-b">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+    <span class="font-semibold text-lg">Two Point Oh</span>
+    <nav class="space-x-6 text-sm">
+      <a href="#features" class="hover:text-primary">Features</a>
+      <a href="#calculator" class="hover:text-primary">Calculator</a>
+      <a href="#how" class="hover:text-primary">How it works</a>
+      <a href="#contact" class="hover:text-primary">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="bg-slate-50">
+  <div class="max-w-7xl mx-auto px-6 py-24 grid md:grid-cols-2 gap-12 items-center">
+    <div>
+      <h1 class="text-4xl md:text-5xl font-bold leading-tight">
+        Two Point Oh<br/>
+        <span class="text-primary">distance between coordinates</span>
+      </h1>
+      <p class="mt-6 text-lg text-slate-600">
+        Enter two coordinate pairs and get the distance in kilometers.
+        Clean, fast, and straightforward.
+      </p>
+      <div class="mt-8 flex gap-4">
+        <a href="#calculator" class="bg-primary text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-flex items-center">
+          Calculate distance
+        </a>
+        <button type="button" onclick="fillExample()" class="border px-6 py-3 rounded-lg hover:bg-slate-100">
+          Load example
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white shadow-xl rounded-xl p-8">
+      <p class="text-sm text-slate-500 mb-2">Summary</p>
+      <p class="font-semibold">Input: 2 points (lat/lon)</p>
+      <p class="font-semibold">Output: distance in km</p>
+      <p class="font-semibold">Mode: online calculation</p>
+      <p class="text-sm text-slate-500 mt-4">
+        Coordinates are used only to compute the result.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="max-w-7xl mx-auto px-6 py-20">
+  <h2 class="text-3xl font-bold mb-12">Features</h2>
+
+  <div class="grid md:grid-cols-4 gap-8">
+    <div>
+      <h3 class="font-semibold mb-2">Fast results</h3>
+      <p class="text-slate-600 text-sm">
+        Get kilometers instantly with one click.
+      </p>
+    </div>
+    <div>
+      <h3 class="font-semibold mb-2">Input validation</h3>
+      <p class="text-slate-600 text-sm">
+        Range checks for latitude/longitude with clear messages.
+      </p>
+    </div>
+    <div>
+      <h3 class="font-semibold mb-2">Clean UI</h3>
+      <p class="text-slate-600 text-sm">
+        A simple form and a built-in result panel (no popups).
+      </p>
+    </div>
+    <div>
+      <h3 class="font-semibold mb-2">Works everywhere</h3>
+      <p class="text-slate-600 text-sm">
+        Responsive on mobile and desktop.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- CALCULATOR -->
+<section id="calculator" class="bg-slate-50">
+  <div class="max-w-7xl mx-auto px-6 py-20">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+      <div>
+        <h2 class="text-3xl font-bold">Distance calculator</h2>
+        <p class="text-slate-600 mt-2">
+          Enter coordinates in decimal degrees.
+        </p>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-8 items-start">
+      <!-- Form -->
+      <div class="lg:col-span-2 bg-white rounded-xl shadow p-8">
+        <form onsubmit="event.preventDefault(); onCalculateClick();" class="space-y-6">
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-slate-700">Latitude 1</label>
+              <input id="lat1" type="text" inputmode="decimal" placeholder="e.g., 47.5975024"
+                     class="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30"/>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700">Longitude 1</label>
+              <input id="lon1" type="text" inputmode="decimal" placeholder="e.g., -122.3492781"
+                     class="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30"/>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-slate-700">Latitude 2</label>
+              <input id="lat2" type="text" inputmode="decimal" placeholder="e.g., 40.7579787"
+                     class="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30"/>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700">Longitude 2</label>
+              <input id="lon2" type="text" inputmode="decimal" placeholder="e.g., -73.9900326"
+                     class="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30"/>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-4">
+            <button id="calcBtn" type="submit"
+              class="bg-primary text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-flex items-center justify-center gap-3">
+              <svg id="spinner" class="hidden animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              <span id="calcBtnText" class="font-semibold">Calculate</span>
+            </button>
+
+            <button type="button" onclick="fillExample()"
+              class="border px-6 py-3 rounded-lg hover:bg-slate-100">
+              Load example
+            </button>
+          </div>
+
+          <p class="text-xs text-slate-500">
+            Decimal separator: dot or comma.
+          </p>
+        </form>
+      </div>
+
+      <!-- Result -->
+      <div class="space-y-4">
+        <div id="resultBox" class="hidden rounded-xl border border-slate-200 bg-white p-5">
+          <p id="resultTitle" class="font-semibold"></p>
+          <p id="resultMessage" class="text-sm text-slate-700 mt-1"></p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="font-semibold">How to use</p>
+          <ol class="mt-2 text-sm text-slate-600 space-y-2 list-decimal list-inside">
+            <li>Enter Latitude/Longitude for point 1 and point 2.</li>
+            <li>Click “Calculate”.</li>
+            <li>Read the distance in kilometers.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="bg-white">
+  <div class="max-w-7xl mx-auto px-6 py-20">
+    <h2 class="text-3xl font-bold mb-12">How it works</h2>
+
+    <div class="grid md:grid-cols-3 gap-10">
+      <div>
+        <span class="text-primary font-bold">01</span>
+        <h3 class="font-semibold mt-2">Enter coordinates</h3>
+        <p class="text-sm text-slate-600">
+          Use decimal degrees (e.g., 40.7128, -74.0060).
+        </p>
+      </div>
+      <div>
+        <span class="text-primary font-bold">02</span>
+        <h3 class="font-semibold mt-2">Compute online</h3>
+        <p class="text-sm text-slate-600">
+          The app sends a POST JSON request to the distance service.
+        </p>
+      </div>
+      <div>
+        <span class="text-primary font-bold">03</span>
+        <h3 class="font-semibold mt-2">View the result</h3>
+        <p class="text-sm text-slate-600">
+          The distance is displayed immediately in the result panel.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="max-w-7xl mx-auto px-6 py-20 text-center">
+  <h2 class="text-3xl font-bold mb-4">
+    Calculate distances in seconds
+  </h2>
+  <p class="text-slate-600 mb-8">
+    Enter coordinates and get the result in kilometers.
+  </p>
+  <a href="#calculator" class="bg-primary text-white px-8 py-4 rounded-lg hover:bg-blue-700 inline-flex">
+    Open calculator
+  </a>
+</section>
+
+<!-- FOOTER -->
+<footer id="contact" class="border-t">
+  <div class="max-w-7xl mx-auto px-6 py-6 text-sm text-slate-500 flex flex-col sm:flex-row gap-2 justify-between">
+    <span>© 2026 Two Point Oh</span>
+    <span>Distance Calculator</span>
+  </div>
+</footer>
+
+</body>
+</html>
