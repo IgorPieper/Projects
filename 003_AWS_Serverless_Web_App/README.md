@@ -126,8 +126,4 @@ This payload can be used directly in the API Gateway test console or via tools s
 - No servers or infrastructure management is required
 - The architecture is intentionally minimal and focused on clarity and correctness
 
----
-
-## License
-Provided as-is.
 
